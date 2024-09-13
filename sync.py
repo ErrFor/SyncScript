@@ -13,19 +13,38 @@ def setup_logging(logfile):
                         ])
 
 def sync_folders(source, replica):
-    # Creating and copying files in the source folder
+    # Synchronization: create and copy files
     for src_dir, dirs, files in os.walk(source):
-        dst_dir = src_dir.replace(source, replica, 1)
-        if not os.path.exists(dst_dir):
-            os.makedirs(dst_dir)
-            logging.info(f"Created directory {dst_dir}")
+        # Getting the appropriate directory in the replica
+        replica_dir = src_dir.replace(source, replica, 1)
+        if not os.path.exists(replica_dir):
+            os.makedirs(replica_dir)
+            logging.info(f"Created directory {replica_dir}")
 
+        # Copy files from the source folder to the replica
         for file_name in files:
             src_file = os.path.join(src_dir, file_name)
-            dst_file = os.path.join(dst_dir, file_name)
-            if not os.path.exists(dst_file) or os.path.getmtime(src_file) > os.path.getmtime(dst_file):
-                shutil.copy2(src_file, dst_file)
-                logging.info(f"Copied file {src_file} to {dst_file}")
+            replica_file = os.path.join(replica_dir, file_name)
+            if not os.path.exists(replica_file) or os.path.getmtime(src_file) > os.path.getmtime(replica_file):
+                shutil.copy2(src_file, replica_file)
+                logging.info(f"Copied file {src_file} to {replica_file}")
+
+    # Deleting files and folders that are not in the source folder
+    for replica_dir, dirs, files in os.walk(replica, topdown=False):
+        src_dir = replica_dir.replace(replica, source, 1)
+
+        # Deleting files
+        for file_name in files:
+            replica_file = os.path.join(replica_dir, file_name)
+            src_file = os.path.join(src_dir, file_name)
+            if not os.path.exists(src_file):
+                os.remove(replica_file)
+                logging.info(f"Removed file {replica_file}")
+
+        # Deleting directories
+        if not os.path.exists(src_dir):
+            shutil.rmtree(replica_dir)
+            logging.info(f"Removed directory {replica_dir}")
 
 def main():
     parser = argparse.ArgumentParser(description='Synchronize two folders.')
