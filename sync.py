@@ -4,6 +4,7 @@ import logging
 import argparse
 import time
 import sys
+import hashlib
 
 def setup_logging(logfile):
     logging.basicConfig(level=logging.INFO,
@@ -12,6 +13,17 @@ def setup_logging(logfile):
                             logging.FileHandler(logfile),
                             logging.StreamHandler()
                         ])
+
+def calculate_md5(file_path):
+    hash_md5 = hashlib.md5()
+    try:
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
+    except Exception as e:
+        logging.error(f"Error calculating MD5 for file {file_path}: {e}")
+        sys.exit(1)
+    return hash_md5.hexdigest()
 
 def sync_folders(source, replica):
     # Synchronization: create and copy files
@@ -27,12 +39,15 @@ def sync_folders(source, replica):
             src_file = os.path.join(src_dir, file_name)
             replica_file = os.path.join(replica_dir, file_name)
             try:
+                src_md5 = calculate_md5(src_file)
                 if not os.path.exists(replica_file):
                     shutil.copy2(src_file, replica_file)
                     logging.info(f"Copied file {src_file} to {replica_file}")
-                elif os.path.getmtime(src_file) > os.path.getmtime(replica_file):
-                    shutil.copy2(src_file, replica_file)
-                    logging.info(f"Modified file {src_file} and updated {replica_file}")    
+                else:
+                    replica_md5 = calculate_md5(replica_file)
+                    if src_md5 != replica_md5:
+                        shutil.copy2(src_file, replica_file)
+                        logging.info(f"Modified file {src_file} and updated {replica_file}")    
             except PermissionError:
                 logging.error(f"Permission denied: Cannot copy file {src_file} to {replica_file}. Please check your permissions.")
                 sys.exit(1)
@@ -66,8 +81,10 @@ def sync_folders(source, replica):
                 logging.info(f"Removed directory {replica_dir}")
             except PermissionError:
                 logging.error(f"Permission denied: Cannot remove directory {replica_dir}. Please check your permissions.")
+                sys.exit(1)
             except Exception as e:
                 logging.error(f"Error removing directory {replica_dir}: {e}")
+                sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(description='Synchronize two folders.')
