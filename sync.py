@@ -32,7 +32,7 @@ def sync_folders(source, replica):
         replica_dir = src_dir.replace(source, replica, 1)
         if not os.path.exists(replica_dir):
             os.makedirs(replica_dir)
-            logging.info(f"Created directory {replica_dir}")
+            logging.info(f"Copied directory {src_dir} to {replica_dir}")
 
         # Copy files from the source folder to the replica
         for file_name in files:
@@ -94,6 +94,8 @@ def main():
     parser.add_argument('--logfile', default='sync.log', help='Log file path')
     
     args = parser.parse_args()
+
+    setup_logging(args.logfile)
     
     try:
             # Check if source directory exists
@@ -102,16 +104,22 @@ def main():
             
             # Check if replica directory exists
             if not os.path.exists(args.replica):
-                raise FileNotFoundError(f"Replica folder '{args.replica}' does not exist.")
+                create_replica = input(f"Replica folder '{args.replica}' does not exist. Do you want to create it? (y/n): ")
+                if create_replica.lower() == 'y':
+                    os.makedirs(args.replica)
+                    logging.info(f"Created replica folder {args.replica}")
+                else:
+                    print("Replica folder does not exist and will not be created. Exiting.")
+                    sys.exit(1)
 
-            setup_logging(args.logfile)
-            
+            # Start synchronization loop
             while True:
                 sync_folders(args.source, args.replica)
                 time.sleep(args.interval)
         
     except FileNotFoundError as e:
         print(e)
+        logging.error(e)
 
 if __name__ == "__main__":
     main()
