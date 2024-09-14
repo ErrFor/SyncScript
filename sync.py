@@ -3,6 +3,7 @@ import shutil
 import logging
 import argparse
 import time
+import sys
 
 def setup_logging(logfile):
     logging.basicConfig(level=logging.INFO,
@@ -14,7 +15,7 @@ def setup_logging(logfile):
 
 def sync_folders(source, replica):
     # Synchronization: create and copy files
-    for src_dir, dirs, files in os.walk(source):
+    for src_dir, _, files in os.walk(source):
         # Getting the appropriate directory in the replica
         replica_dir = src_dir.replace(source, replica, 1)
         if not os.path.exists(replica_dir):
@@ -25,12 +26,22 @@ def sync_folders(source, replica):
         for file_name in files:
             src_file = os.path.join(src_dir, file_name)
             replica_file = os.path.join(replica_dir, file_name)
-            if not os.path.exists(replica_file) or os.path.getmtime(src_file) > os.path.getmtime(replica_file):
-                shutil.copy2(src_file, replica_file)
-                logging.info(f"Copied file {src_file} to {replica_file}")
+            try:
+                if not os.path.exists(replica_file):
+                    shutil.copy2(src_file, replica_file)
+                    logging.info(f"Copied file {src_file} to {replica_file}")
+                elif os.path.getmtime(src_file) > os.path.getmtime(replica_file):
+                    shutil.copy2(src_file, replica_file)
+                    logging.info(f"Modified file {src_file} and updated {replica_file}")    
+            except PermissionError:
+                logging.error(f"Permission denied: Cannot copy file {src_file} to {replica_file}. Please check your permissions.")
+                sys.exit(1)
+            except Exception as e:
+                logging.error(f"Error copying file {src_file} to {replica_file}: {e}")
+                sys.exit(1)
 
     # Deleting files and folders that are not in the source folder
-    for replica_dir, dirs, files in os.walk(replica, topdown=False):
+    for replica_dir, _, files in os.walk(replica, topdown=False):
         src_dir = replica_dir.replace(replica, source, 1)
 
         # Deleting files
@@ -38,13 +49,25 @@ def sync_folders(source, replica):
             replica_file = os.path.join(replica_dir, file_name)
             src_file = os.path.join(src_dir, file_name)
             if not os.path.exists(src_file):
-                os.remove(replica_file)
-                logging.info(f"Removed file {replica_file}")
+                try:
+                    os.remove(replica_file)
+                    logging.info(f"Removed file {replica_file}")
+                except PermissionError:
+                    logging.error(f"Permission denied: Cannot remove file {replica_file}. Please check your permissions.")
+                    sys.exit(1)
+                except Exception as e:
+                    logging.error(f"Error removing file {replica_file}: {e}")
+                    sys.exit(1)
 
         # Deleting directories
         if not os.path.exists(src_dir):
-            shutil.rmtree(replica_dir)
-            logging.info(f"Removed directory {replica_dir}")
+            try:
+                shutil.rmtree(replica_dir)
+                logging.info(f"Removed directory {replica_dir}")
+            except PermissionError:
+                logging.error(f"Permission denied: Cannot remove directory {replica_dir}. Please check your permissions.")
+            except Exception as e:
+                logging.error(f"Error removing directory {replica_dir}: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description='Synchronize two folders.')
