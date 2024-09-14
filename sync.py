@@ -55,11 +55,23 @@ def main():
     
     args = parser.parse_args()
     
-    setup_logging(args.logfile)
-    
-    while True:
-        sync_folders(args.source, args.replica)
-        time.sleep(args.interval)
+    try:
+            # Check if source directory exists
+            if not os.path.exists(args.source):
+                raise FileNotFoundError(f"Source folder '{args.source}' does not exist.")
+            
+            # Check if replica directory exists
+            if not os.path.exists(args.replica):
+                raise FileNotFoundError(f"Replica folder '{args.replica}' does not exist.")
+
+            setup_logging(args.logfile)
+            
+            while True:
+                sync_folders(args.source, args.replica)
+                time.sleep(args.interval)
+        
+    except FileNotFoundError as e:
+        print(e)
 
 if __name__ == "__main__":
     main()
