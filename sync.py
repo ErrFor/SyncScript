@@ -6,6 +6,7 @@ import time
 import sys
 import hashlib
 
+# Set up logging to both a file and console
 def setup_logging(logfile):
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -14,24 +15,29 @@ def setup_logging(logfile):
                             logging.StreamHandler()
                         ])
 
+# Calculate MD5 checksum for a file to check if two files are identical
 def calculate_md5(file_path):
     hash_md5 = hashlib.md5()
     try:
         with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
+            # Read the file in chunks of 512KB (524288 bytes)
+            for chunk in iter(lambda: f.read(524288), b""):
                 hash_md5.update(chunk)
     except Exception as e:
+        # Log and exit in case of an error while calculating the hash
         logging.error(f"Error calculating MD5 for file {file_path}: {e}")
         sys.exit(1)
     return hash_md5.hexdigest()
 
+# Синхронизация двух папок
 def sync_folders(source, replica):
     sync_occurred = False
 
-    # Synchronization: create and copy files
+    # Walk through the source directory to find files and directories
     for src_dir, _, files in os.walk(source):
-        # Getting the appropriate directory in the replica
         replica_dir = src_dir.replace(source, replica, 1)
+
+        # Create the directory if it doesn't exist
         if not os.path.exists(replica_dir):
             os.makedirs(replica_dir)
             logging.info(f"Copied directory {src_dir} to {replica_dir}")
@@ -42,14 +48,19 @@ def sync_folders(source, replica):
             src_file = os.path.join(src_dir, file_name)
             replica_file = os.path.join(replica_dir, file_name)
             try:
+                # Calculate the MD5 checksum of the source file
                 src_md5 = calculate_md5(src_file)
+
+                # Copy the file if it doesn't exist in the replica
                 if not os.path.exists(replica_file):
                     shutil.copy2(src_file, replica_file)
                     logging.info(f"Copied file {src_file} to {replica_file}")
                     sync_occurred = True
                 else:
+                    # Compare the MD5 checksums of the source and replica files
                     replica_md5 = calculate_md5(replica_file)
                     if src_md5 != replica_md5:
+                        # Modified the replica file if it is different from the source file
                         shutil.copy2(src_file, replica_file)
                         logging.info(f"Modified file {src_file} and updated {replica_file}")    
                         sync_occurred = True
@@ -60,7 +71,7 @@ def sync_folders(source, replica):
                 logging.error(f"Error copying file {src_file} to {replica_file}: {e}")
                 sys.exit(1)
 
-    # Deleting files and folders that are not in the source folder
+    # Walk through the replica directory to find files and directories that no longer exist in the source
     for replica_dir, _, files in os.walk(replica, topdown=False):
         src_dir = replica_dir.replace(replica, source, 1)
 
@@ -111,7 +122,7 @@ def main():
             if not os.path.exists(args.source):
                 raise FileNotFoundError(f"Source folder '{args.source}' does not exist.")
             
-            # Check if replica directory exists
+            # Check if replica directory exists, prompt user if it does not
             if not os.path.exists(args.replica):
                 create_replica = input(f"Replica folder '{args.replica}' does not exist. Do you want to create it? (y/n): ")
                 if create_replica.lower() == 'y':
@@ -121,13 +132,15 @@ def main():
                     logging.info("Replica folder does not exist and will not be created. Exiting.")
                     sys.exit(1)
 
-            # Start synchronization loop
+            # Main synchronization loop
             while True:
                 sync_occurred = sync_folders(args.source, args.replica)
                 if sync_occurred:
                     logging.info("Synchronization completed successfully.")
                 else:
                     logging.info("No changes detected. Synchronization not required.")
+
+                # Sleep for the specified interval before the next sync    
                 time.sleep(args.interval)
         
     except FileNotFoundError as e:
