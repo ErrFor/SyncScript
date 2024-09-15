@@ -29,9 +29,13 @@ def calculate_md5(file_path):
         sys.exit(1)
     return hash_md5.hexdigest()
 
-# Синхронизация двух папок
+# Synchronization of two folders
 def sync_folders(source, replica):
     sync_occurred = False
+    files_synced = 0  # Counter for the number of synced files
+    files_removed = 0  # Counter for the number of removed files
+    dirs_removed = 0  # Counter for the number of removed directories
+    dirs_created = 0  # Counter for the number of created directories
 
     # Walk through the source directory to find files and directories
     for src_dir, _, files in os.walk(source):
@@ -42,6 +46,7 @@ def sync_folders(source, replica):
             os.makedirs(replica_dir)
             logging.info(f"Copied directory {src_dir} to {replica_dir}")
             sync_occurred = True
+            dirs_created += 1
 
         # Copy files from the source folder to the replica
         for file_name in files:
@@ -56,6 +61,7 @@ def sync_folders(source, replica):
                     shutil.copy2(src_file, replica_file)
                     logging.info(f"Copied file {src_file} to {replica_file}")
                     sync_occurred = True
+                    files_synced += 1
                 else:
                     # Compare the MD5 checksums of the source and replica files
                     replica_md5 = calculate_md5(replica_file)
@@ -64,6 +70,7 @@ def sync_folders(source, replica):
                         shutil.copy2(src_file, replica_file)
                         logging.info(f"Modified file {src_file} and updated {replica_file}")    
                         sync_occurred = True
+                        files_synced += 1
             except PermissionError:
                 logging.error(f"Permission denied: Cannot copy file {src_file} to {replica_file}. Please check your permissions.")
                 sys.exit(1)
@@ -84,6 +91,7 @@ def sync_folders(source, replica):
                     os.remove(replica_file)
                     logging.info(f"Removed file {replica_file}")
                     sync_occurred = True
+                    files_removed += 1
                 except PermissionError:
                     logging.error(f"Permission denied: Cannot remove file {replica_file}. Please check your permissions.")
                     sys.exit(1)
@@ -97,6 +105,7 @@ def sync_folders(source, replica):
                 shutil.rmtree(replica_dir)
                 logging.info(f"Removed directory {replica_dir}")
                 sync_occurred = True
+                dirs_removed += 1
             except PermissionError:
                 logging.error(f"Permission denied: Cannot remove directory {replica_dir}. Please check your permissions.")
                 sys.exit(1)
@@ -104,7 +113,7 @@ def sync_folders(source, replica):
                 logging.error(f"Error removing directory {replica_dir}: {e}")
                 sys.exit(1)
 
-    return sync_occurred                
+    return sync_occurred, files_synced, files_removed, dirs_removed, dirs_created                
 
 def main():
     parser = argparse.ArgumentParser(description='Synchronize two folders.')
@@ -134,9 +143,11 @@ def main():
 
             # Main synchronization loop
             while True:
-                sync_occurred = sync_folders(args.source, args.replica)
+                sync_occurred, files_synced, files_removed, dirs_removed, dirs_created = sync_folders(args.source, args.replica)
                 if sync_occurred:
-                    logging.info("Synchronization completed successfully.")
+                    logging.info(
+                        f"Synchronization completed successfully. {files_synced} files were synced, {dirs_created} directories were synced. {files_removed} files were removed, and {dirs_removed} directories were removed."
+                        )
                 else:
                     logging.info("No changes detected. Synchronization not required.")
 
