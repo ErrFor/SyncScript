@@ -35,7 +35,7 @@ def sync_folders(source, replica):
     files_synced = 0  # Counter for the number of synced files
     files_removed = 0  # Counter for the number of removed files
     dirs_removed = 0  # Counter for the number of removed directories
-    dirs_created = 0  # Counter for the number of created directories
+    dirs_synced = 0  # Counter for the number of synced directories
 
     # Walk through the source directory to find files and directories
     for src_dir, _, files in os.walk(source):
@@ -46,7 +46,7 @@ def sync_folders(source, replica):
             os.makedirs(replica_dir)
             logging.info(f"Copied directory {src_dir} to {replica_dir}")
             sync_occurred = True
-            dirs_created += 1
+            dirs_synced += 1
 
         # Copy files from the source folder to the replica
         for file_name in files:
@@ -113,7 +113,7 @@ def sync_folders(source, replica):
                 logging.error(f"Error removing directory {replica_dir}: {e}")
                 sys.exit(1)
 
-    return sync_occurred, files_synced, files_removed, dirs_removed, dirs_created                
+    return sync_occurred, files_synced, files_removed, dirs_removed, dirs_synced               
 
 def main():
     parser = argparse.ArgumentParser(description='Synchronize two folders.')
@@ -143,10 +143,10 @@ def main():
 
             # Main synchronization loop
             while True:
-                sync_occurred, files_synced, files_removed, dirs_removed, dirs_created = sync_folders(args.source, args.replica)
+                sync_occurred, files_synced, files_removed, dirs_removed, dirs_synced = sync_folders(args.source, args.replica)
                 if sync_occurred:
                     logging.info(
-                        f"Synchronization completed successfully. {files_synced} files were synced, {dirs_created} directories were synced. {files_removed} files were removed, and {dirs_removed} directories were removed."
+                        f"Synchronization completed successfully. {files_synced} files were synced, {dirs_synced} directories were synced. {files_removed} files were removed, and {dirs_removed} directories were removed."
                         )
                 else:
                     logging.info("No changes detected. Synchronization not required.")
